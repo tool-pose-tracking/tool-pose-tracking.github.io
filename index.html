@@ -440,7 +440,7 @@ function drawChart(){
 function rank(rows, ci, col){ var v = rows.map(function(r){ return r.v[ci]; }).filter(function(x){ return x != null; }); var u = Array.from(new Set(v)).sort(function(a, b){ return col.better === 'lower' ? a - b : b - a; }); return { best:u[0], second:u[1] }; }
 function gcls(i){ return i < 6 ? 'g0' + (i === 0 ? ' g0s' : '') : 'g1' + (i === 6 ? ' gs' : ''); }   // column group: 0-5 consecutive, 6-11 initial-to-subsequent
 function bigTable(rows, nameOf, isOurs, sepAt, mode){
-  var bestCls = mode ? ' top' : ' best', t = el('table', mode === 'row' ? { 'class':'rowhl' } : {}), h = '<thead><tr><th rowspan="2" class="l">Method</th><th colspan="6" class="grp g0">Consecutive frames (i → i+1)</th><th colspan="6" class="grp g1 gs">Initial-to-subsequent frames (0 → i)</th></tr><tr>';
+  var bestCls = ' top', t = el('table', mode === 'row' ? { 'class':'rowhl' } : {}), h = '<thead><tr><th rowspan="2" class="l">Method</th><th colspan="6" class="grp g0">Consecutive frames (i → i+1)</th><th colspan="6" class="grp g1 gs">Initial-to-subsequent frames (0 → i)</th></tr><tr>';
   P.columns.forEach(function(c, i){ h += '<th class="' + gcls(i) + '">' + (c.stat === 'AUC' ? '' : c.stat + '<br>') + c.metric + (c.better === 'lower' ? ' ↓' : ' ↑') + '</th>'; });
   h += '</tr></thead><tbody>';
   var rk = P.columns.map(function(c, i){ return rank(rows, i, c); });
@@ -483,7 +483,7 @@ lb.addEventListener('click', function(){ lb.close(); });
   t.innerHTML = h + '</tbody>'; t.className = 'rowhl'; t.style.minWidth = '560px'; $('#t2').appendChild(t);
   cap($('#t2note'), 'Table 2.', 'Refiner inputs. ' + T.note + ' Bold and underlined values indicate the best and second-best performance, respectively. The highlighted row shows results for our method.'); })();
 (function(){ var host = $('#t3'); P.datasets.forEach(function(d, di){ host.appendChild(el('p', { style:'font:600 .85rem var(--body);margin:' + (di ? '1rem' : '0') + ' 0 .2rem' }, d)); host.appendChild(bigTable(P.table3[d], function(r){ return r.name.replace('FP', 'FoundationPose').replace(/GDINO/g, 'Grounding DINO'); }, function(r){ return r.name === 'Ours (train, eval: GDINO+SAM 2)'; }, 2, 'plain')); });
-  $('#t4').appendChild(bigTable(P.table4.DexYCB, function(r){ return P.methods[r.id].replace(' (w/ silhouette loss)', ''); }, function(r){ return r.id === 'ours'; })); })();
+  $('#t4').appendChild(bigTable(P.table4.DexYCB, function(r){ return P.methods[r.id].replace(' (w/ silhouette loss)', ''); }, function(r){ return r.id === 'ours'; }, undefined, 'row')); })();
 
 (function(){ var cols = P.columns.slice(0, 6), h = '<thead><tr><th class="l">Dataset</th><th class="l">Interval</th>' + cols.map(function(c){ return '<th>' + (c.stat === 'AUC' ? '' : c.stat + ' ') + c.metric + (c.better === 'lower' ? ' ↓' : ' ↑') + '</th>'; }).join('') + '</tr></thead><tbody>';
   P.datasets.forEach(function(d){ var rows = {}; P.table1[d].forEach(function(r){ rows[r.id] = r.v; });
