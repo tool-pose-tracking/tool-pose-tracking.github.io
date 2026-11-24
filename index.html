@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tool Pose Estimation and Tracking Needs a Helping Hand</title>
+<meta name="description" content="We turn the hand from a source of occlusion into a source of information for 6-DoF tool pose estimation and tracking.">
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/fonts/title-fonts.css">
+<link rel="stylesheet" href="assets/katex/katex.min.css">
+<style>
+:root{
+  --paper:#f7f2e8; --card:#fffdf8; --ink:#1c1a17; --muted:#6d675b; --line:#dcd3c1; --soft:#ece5d6;
+  --hand:#e8770f; --obj:#d6398b; --pred:#2382c9; --bad:#d8342c; --good:#1e7d45;
+  --display:'Fraunces',Georgia,serif; --body:'Figtree',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --text:42rem; --wide:68rem;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 1.0625rem/1.65 var(--body);-webkit-font-smoothing:antialiased}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration-color:var(--hand);text-underline-offset:.18em}
+.wrap{max-width:var(--text);margin:0 auto;padding:0 1.25rem}
+.wide{max-width:var(--wide);margin:0 auto;padding:0 1.25rem}
+.kicker{font:500 .78rem/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3{font-family:var(--display);font-weight:500;letter-spacing:-.015em;line-height:1.08;margin:0}
+h2{font-size:clamp(1.9rem,4.2vw,2.75rem);margin:.4rem 0 1.1rem;font-variation-settings:'opsz' 96}
+h3{font-size:1.3rem;margin:1.8rem 0 .5rem}
+p{margin:0 0 1.05rem}
+p,figcaption,.trip span,.facts span{text-align:justify}
+em.hl{font-style:normal;background:linear-gradient(transparent 62%,rgba(232,119,15,.28) 62%)}
+.hand{color:var(--hand);font-weight:600}.obj{color:var(--obj);font-weight:600}.pred{color:var(--pred);font-weight:600}.badc{color:var(--bad);font-weight:600}
+section{padding:4.2rem 0 1rem}
+.num{font:500 .8rem var(--mono);color:var(--hand);letter-spacing:.08em}
+figure{margin:1.8rem 0}
+.lbl{font-weight:700;color:var(--ink)}
+.spaced{margin-bottom:3.5rem}
+figcaption{font-size:.9rem;line-height:1.5;color:var(--muted);margin-top:.7rem}
+.btn{font:600 .92rem var(--body);display:inline-flex;align-items:center;gap:.45rem;padding:.6rem 1rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);text-decoration:none;cursor:pointer}
+.btn.soon{border-style:dashed;border-color:var(--muted);color:var(--muted);background:transparent;cursor:default}
+.btn small{font:500 .68rem var(--mono);opacity:.8}
+button:focus-visible,a:focus-visible,canvas:focus-visible{outline:2.5px solid var(--pred);outline-offset:3px}
+
+/* hero */
+header.hero{padding:2.6rem 1.25rem 1rem}
+header.hero h1{font-family:'EB Garamond',Georgia,serif;font-size:clamp(2.4rem,5.2vw,4.3rem);font-variation-settings:'opsz' 144;font-weight:400;margin:.5rem 0 0}
+header.hero h1 i{font-weight:500;color:var(--hand);white-space:nowrap}
+h2 i.pop{color:var(--hand);white-space:nowrap}
+.links{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.2rem}
+
+.chip{font:600 .82rem var(--body);padding:.42rem .8rem;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* teaser */
+.teaser-fig{margin:3rem 0 0}
+#problem{padding-top:2.5rem}
+.teaser{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}
+.teaser figure{margin:0}.teaser img{border-radius:8px;width:100%}
+.teaser figcaption{margin-top:.35rem;font:500 .78rem var(--mono);text-transform:uppercase;letter-spacing:.06em}
+.masks{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.masks figure{margin:0}.masks img{border-radius:8px}
+.masks figcaption{margin-top:.35rem;font:500 .78rem var(--mono);text-transform:uppercase;letter-spacing:.06em}
+
+/* three reasons */
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem;margin:1.6rem 0}
+.three div{border-top:2px solid var(--ink);padding-top:.8rem}
+.three b{display:block;font:400 3.2rem/1 var(--display);color:var(--hand);font-variation-settings:'opsz' 144}
+.three strong{display:block;font:600 1.1rem/1.3 var(--display);margin:.5rem 0 .35rem}
+.three p{font-size:.95rem;line-height:1.5;margin:0;color:#3a362e}
+
+/* diagram */
+.diagram{background:#fff;border:1px solid var(--line);border-radius:14px;padding:1rem;overflow-x:auto}
+.diagram img{min-width:720px;width:100%;height:auto;display:block}
+
+/* math */
+.eqs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;margin:1.5rem 0}
+.eq{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.1rem 1.2rem}
+.eq.refine{margin:0 0 1rem}
+.eq h4{margin:0 0 .2rem;font:600 1.05rem var(--display)}
+.eq p{font-size:.92rem;line-height:1.5;margin:.6rem 0 0;color:#3a362e}
+.kx{overflow-x:auto;overflow-y:hidden}
+.kx .katex-display{margin:.5rem 0;text-align:left}
+.kx .katex-display>.katex{text-align:left}
+.kx .katex{font-size:1.12em}
+.pair{display:flex;flex-wrap:wrap;align-items:center;column-gap:3rem}
+.pair .kx{max-width:100%;padding-right:.2em}   /* KaTeX overhangs its box by ~2px, which showed a scrollbar */
+.trip{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem}
+.trip figure{margin:0}.trip img{border-radius:10px}
+.trip b{display:block;font:600 1rem var(--display);margin:.55rem 0 .15rem}
+.trip span{font-size:.88rem;line-height:1.45;color:var(--muted);display:block}
+
+/* results */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:1.2rem}
+.ctl{display:flex;flex-wrap:wrap;gap:.5rem 1.4rem;margin-bottom:1rem}
+.ctl > div{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+.ctl label{font:500 .72rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-right:.3rem}
+.bars{display:grid;gap:.42rem}
+.bar{display:grid;grid-template-columns:17.5rem 1fr 5.2rem;gap:.8rem;align-items:center;font-size:.9rem}
+.bar .name{white-space:nowrap}
+.bar .name small{font:500 .66rem var(--mono);color:var(--muted);margin-left:.4em;text-transform:uppercase;letter-spacing:.05em}
+.bar .track{height:1.25rem;background:var(--soft);border-radius:5px;position:relative;overflow:hidden}
+.bar .fill{position:absolute;inset:0 auto 0 0;background:#b9ae98;border-radius:5px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.bar.ours .fill{background:var(--hand)}.bar.ours .name{font-weight:700}
+.bar.nosil .fill{background:#f0b278}
+.bar.cut .fill{border-radius:5px 0 0 5px;background-image:repeating-linear-gradient(115deg,transparent 0 6px,rgba(255,255,255,.5) 6px 9px)}
+.bar output{font:500 .84rem var(--mono);text-align:right;white-space:nowrap}
+.bar.na .track{background:repeating-linear-gradient(90deg,var(--soft) 0 4px,transparent 4px 8px)}
+.chartnote{font-size:.84rem;color:var(--muted);margin:.9rem 0 0;line-height:1.5}
+details{margin-top:1rem}
+summary{cursor:pointer;font:600 .92rem var(--body)}
+.tblwrap{overflow-x:auto;margin-top:.8rem}
+table{border-collapse:collapse;font:400 .76rem var(--mono);width:100%;min-width:760px}
+th,td{padding:.32rem .45rem;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+thead th{font-weight:600;color:var(--muted);border-bottom:1.5px solid var(--ink)}
+thead th.grp{text-align:center;color:var(--ink);font:700 .8rem var(--body);padding:.45rem}
+th.g1,td.g1{background:rgba(28,26,23,.045)}
+th.g0s,td.g0s{border-left:1px solid var(--line)}
+th.gs,td.gs{border-left:2px solid var(--ink)}
+td.best{font-weight:700;color:var(--ink);background:rgba(232,119,15,.16)}
+td.top{font-weight:800;color:var(--ink)}
+table.rowhl tr.ours td{background:rgba(232,119,15,.16)}
+td.gain{color:var(--good);font-weight:700}
+td.second{text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:.2em}
+tr.ours td:first-child,tr.ours td.l{font-weight:700}
+tr.sep td{border-top:1.5px solid var(--ink)}
+tr.dash td{border-top:1.5px dashed var(--ink)}
+tr:has(+ tr.dash) td{border-bottom:0}   /* else the solid row line wins the collapsed-border conflict */
+td.worse{color:var(--bad);font-weight:700}
+
+/* viewer */
+.grid{display:grid;grid-template-columns:8.5rem repeat(5,1fr);gap:.35rem;align-items:center}
+.grid .hd{font:500 .72rem var(--mono);color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.06em}
+.grid .rl{font:600 .88rem/1.25 var(--body);padding-right:.4rem}
+.grid .rl.ours{color:var(--hand)}
+.grid img{border-radius:6px;cursor:zoom-in;width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--soft)}
+dialog{border:0;padding:0;background:transparent;max-width:min(96vw,1100px)}
+dialog::backdrop{background:rgba(20,18,15,.82)}
+dialog img{width:100%;border-radius:10px}
+dialog p{color:#fff;font:500 .9rem var(--body);margin:.6rem 0 0;text-align:center}
+
+/* dataset */
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:1.4rem 0}
+.facts div{border-top:2px solid var(--ink);padding-top:.5rem}
+.facts b{display:block;font:400 2.3rem/1.05 var(--display)}
+.facts span{display:block;font-size:.85rem;line-height:1.45;color:var(--muted);margin-top:.3rem}
+.pills{display:flex;flex-wrap:wrap;gap:.35rem;margin:.4rem 0 1rem}
+.pills span{font:500 .8rem var(--mono);border:1px solid var(--line);background:var(--card);border-radius:99px;padding:.22rem .7rem}
+.two{display:grid;grid-template-columns:1.1fr 1fr;gap:1.6rem;align-items:start}
+.two img{border-radius:12px}
+footer{padding:3rem 0 4rem;color:var(--muted);font-size:.88rem}
+
+@media (max-width:860px){
+  header.hero{padding-top:2rem}
+  .eqs{grid-template-columns:minmax(0,1fr)}
+  .two{grid-template-columns:1fr}
+  .three{grid-template-columns:1fr}
+  .teaser{grid-template-columns:repeat(2,1fr)}
+  .trip{grid-template-columns:1fr}
+  .facts{grid-template-columns:repeat(2,1fr)}
+  .bar{grid-template-columns:1fr 5.4rem;gap:.15rem .6rem}
+  .bar .name{grid-column:1/-1;white-space:normal}
+  .grid{grid-template-columns:repeat(5,1fr)}
+  .grid .rl{grid-column:1/-1;margin-top:.5rem}
+  .grid .corner{display:none}
+  section{padding-top:3rem}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+<header class="hero wide" id="top">
+  <div class="kicker">CVPR 2027 submission · under review · Anonymous authors</div>
+  <h1>Tool Pose Estimation and Tracking Needs a <i>Helping Hand</i></h1>
+  <div class="links">
+    <!-- TODO: replace the three placeholder links below once the paper, code and dataset are public. -->
+    <a class="btn soon" href="#" data-todo="paper" aria-disabled="true">Paper <small>coming soon</small></a>
+    <a class="btn soon" href="#" data-todo="code" aria-disabled="true">Code <small>coming soon</small></a>
+    <a class="btn soon" href="#" data-todo="data" aria-disabled="true">MoCap Tools dataset <small>coming soon</small></a>
+  </div>
+</header>
+
+<!-- ============ TEASER ============ -->
+<div class="wide"><figure class="teaser-fig" id="fig1">
+  <div class="teaser">
+    <figure><img src="assets/img/teaser_rgb.jpg" alt="Egocentric video frame: a gloved hand holds a fork over a paper plate; the fork's ground-truth outline is drawn in pink and the zoomed region is boxed."><figcaption>Full frame</figcaption></figure>
+    <figure><img src="assets/img/teaser_gt.jpg" alt="Ground-truth fork outline and pose axes."><figcaption>Ground-Truth</figcaption></figure>
+    <figure><img src="assets/img/teaser_ours.jpg" alt="Ours: the predicted fork outline sits on the real fork; the hand mask is outlined in orange."><figcaption>Ours</figcaption></figure>
+    <figure><img src="assets/img/teaser_prior.jpg" alt="Prior art: the predicted fork outline lands on the plate, far from the real fork."><figcaption>Prior art (FoundationPose)</figcaption></figure>
+  </div>
+<figcaption><b class="lbl">Figure 1.</b> One frame of an egocentric video. Outlines show the fork mesh rendered at the <span class="obj">ground-truth</span> and <span class="pred">predicted</span> poses. The <span class="hand">hand mask</span> that our method leverages is outlined in orange.</figcaption></figure></div>
+
+<!-- ============ PROBLEM ============ -->
+<section id="problem">
+  <div class="wrap">
+    <div class="num">01 · THE PROBLEM</div>
+    <h2>When the hand occludes a tool, even the right pose can look wrong.</h2>
+    <p>To understand how a tool is being used, we want to estimate its 6-DoF pose over time. State-of-the-art methods do this by <em class="hl">render-and-compare</em>: render the object at a hypothesized pose, compare with observation image, update the hypothesized pose, repeat.</p>
+    <p>That works when the object is fully visible. A hand-held tool is not. <em class="hl">Tools are thin, symmetric and often textureless, and are frequently occluded by the hand during manipulation.</em> This means even at the <em>correct</em> pose, a render of the whole tool looks nothing like the occluded observation, so the comparison itself misleads the tracker.</p>
+  </div>
+  <div class="wide">
+    <figure>
+      <div class="masks">
+        <figure><img src="assets/img/mask_brush.jpg" alt="Brush held in a gloved hand; only a small region is outlined as visible." loading="lazy"><figcaption>Brush</figcaption></figure>
+        <figure><img src="assets/img/mask_spatula.jpg" alt="Spatula, mostly hidden by the hand." loading="lazy"><figcaption>Spatula</figcaption></figure>
+        <figure><img src="assets/img/mask_marker.jpg" alt="Marker, mostly hidden by the hand." loading="lazy"><figcaption>Marker</figcaption></figure>
+      </div>
+      <figcaption><b class="lbl">Figure 2.</b> Examples from MoCap Tools dataset. Pink outlines mark the small portions of each tool that remain visible around the hand.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ IDEA ============ -->
+<section id="idea"><div class="wrap">
+  <div class="num">02 · THE INSIGHT</div>
+  <h2>The <i class="pop">hand mask</i> offers clues about where the tool is hidden.</h2>
+  <p>As <a href="#fig1">Figure 1</a> shows, we cannot see the whole fork, but we know it continues behind the fingers. The <span class="obj">object mask</span> says which pixels the projected tool should cover. The <span class="hand">hand mask</span> says where the hidden part may extend. A hand silhouette knows three things:</p>
+  </div>
+  <div class="wide"><div class="three">
+    <div><b>1</b><strong>Where the hidden pixels can be</strong><p>The hand is the dominant occluder. Knowing its mask lets the model conjecture where the tool's occluded pixels are.</p></div>
+    <div><b>2</b><strong>Where the tool is going</strong><p>The hand causes the tool's motion, so knowing where the hand is helps track the tool across frames.</p></div>
+    <div><b>3</b><strong>How the tool is turned</strong><p>The hand holds the tool. Its silhouette carries cues about the grasp, and the grasp about the tool's orientation.</p></div>
+  </div></div>
+  <div class="wrap"><p>We use hand <em>masks</em>, not hand <em>pose estimates</em>, which we found to be noisy (<a href="#ablation">see the ablation</a>).</p></div>
+</section>
+
+<!-- ============ METHOD ============ -->
+<section id="method">
+  <div class="wrap">
+    <div class="num">03 · THE METHOD</div>
+    <h2>Hand and object masks guide pose refinement.</h2>
+    <p>We build on FoundationPose. Its refinement network compares a rendered RGB-D crop with the observed one and predicts a rotation and translation update. It runs on every frame, so that is the part we change; the first-frame scoring network is left as is.</p>
+    <p>For each frame we segment the object and the hand with Grounding DINO and SAM 2, crop both masks with the same pose-dependent crop as the image (2 × 160 × 160), and encode them with a three-layer convolutional branch into a 512 × 20 × 20 map that is simply added to the fused image features.</p>
+  </div>
+  <div class="wide"><figure>
+    <div class="diagram">
+      <img src="assets/img/refiner_architecture.png" width="2121" height="1103" alt="Architecture: rendered and observed RGB-D crops pass through shared frozen encoders and a frozen fusion encoder to give image features F_I. Hand and object masks from Grounding DINO + SAM 2 pass through a trainable mask encoder to give mask features F_M, which are added to F_I. A positional embedding is added and trainable transformer heads predict the rotation and translation updates.">
+    </div>
+    <figcaption><b class="lbl">Figure 3.</b> Our proposed mask-augmented refinement network adds hand and object mask features to the fused RGB-D features before predicting a pose update. </figcaption>
+  </figure></div>
+  <div class="wrap">
+    <p>We initialise from FoundationPose and fine-tune on the HOI4D training set, holding out 5% of the clips (66) for validation. We use object meshes reconstructed with BundleSDF for fine-tuning, validation, and testing. We keep the epoch-1 checkpoint, which had the lowest overall relative pose error on the validation clips.</p>
+  </div>
+</section>
+
+<!-- ============ LOSS ============ -->
+<section id="loss">
+  <div class="wrap">
+    <div class="num">04 · THE SILHOUETTE LOSS</div>
+    <h2>A silhouette loss for pose refinement under occlusion.</h2>
+    <p>Beyond conditioning on hand and object masks, we also supervise the refined pose with a differentiable <em class="hl">silhouette loss</em>. We sample <i>P</i> = 512 points from the mesh surface, project them into the image crop using the refined pose. We use the resulting pixel coordinates <i>u<sub>k</sub></i> to compute the coverage and outside loss terms.</p>
+  </div>
+  <div class="wide">
+    <div class="eqs">
+      <div class="eq"><h4><span class="obj">Coverage</span> — the projected tool must cover every visible tool pixel</h4>
+        <div class="kx"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>L</mi><mtext>cov</mtext></msub><mo>=</mo><mfrac><mn>1</mn><mi>Q</mi></mfrac><munder><mo>∑</mo><mi>q</mi></munder><munder><mrow><mi>min</mi><mo>⁡</mo></mrow><mi>k</mi></munder><mtext> </mtext><mo stretchy="false">∥</mo><msub><mi>p</mi><mi>q</mi></msub><mo>−</mo><msub><mi>u</mi><mi>k</mi></msub><msub><mo stretchy="false">∥</mo><mn>2</mn></msub></mrow><annotation encoding="application/x-tex">L_{\text{cov}} = \frac{1}{Q}\sum_{q}\min_{k}\,\lVert p_q - u_k \rVert_2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">L</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">cov</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.7076em;vertical-align:-1.3861em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal">Q</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.8804em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.05em;"><span style="top:-1.9em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">q</span></span></span></span><span style="top:-3.05em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.3861em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.6679em;"><span style="top:-2.3479em;margin-left:0em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span></span></span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span><span class="mop">min</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.7521em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mopen">∥</span><span class="mord"><span class="mord mathnormal">p</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">q</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathnormal">u</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose"><span class="mclose">∥</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span></div>
+        <p><i>Q</i> = 512 pixels <i>p<sub>q</sub></i> are sampled from the object mask <i>O</i>; each pulls its nearest projected point towards it.</p></div>
+      <div class="eq"><h4><span class="badc">Outside</span> — no tool point may leave the two masks</h4>
+        <div class="kx"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>L</mi><mtext>out</mtext></msub><mo>=</mo><mfrac><mn>1</mn><mi>P</mi></mfrac><munder><mo>∑</mo><mi>k</mi></munder><mo fence="false" stretchy="true" minsize="1.8em" maxsize="1.8em">[</mo><mtext> </mtext><msub><mi>D</mi><mi>U</mi></msub><mo fence="false" stretchy="true" minsize="1.2em" maxsize="1.2em">(</mo><mi>π</mi><mo stretchy="false">(</mo><msub><mi>u</mi><mi>k</mi></msub><mo stretchy="false">)</mo><mo fence="false" stretchy="true" minsize="1.2em" maxsize="1.2em">)</mo><mo>+</mo><mo stretchy="false">∥</mo><msub><mi>u</mi><mi>k</mi></msub><mo>−</mo><mi>π</mi><mo stretchy="false">(</mo><msub><mi>u</mi><mi>k</mi></msub><mo stretchy="false">)</mo><msub><mo stretchy="false">∥</mo><mn>2</mn></msub><mo fence="false" stretchy="true" minsize="1.8em" maxsize="1.8em">]</mo></mrow><annotation encoding="application/x-tex">L_{\text{out}} = \frac{1}{P}\sum_{k}\Big[\, D_U\big(\pi(u_k)\big) + \lVert u_k - \pi(u_k)\rVert_2 \Big]</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">L</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">out</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.6236em;vertical-align:-1.3021em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">P</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.05em;"><span style="top:-1.8479em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span></span></span></span><span style="top:-3.05em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.3021em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="delimsizing size2">[</span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:-0.0278em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.10903em;">U</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord"><span class="delimsizing size1">(</span></span><span class="mord mathnormal" style="margin-right:0.03588em;">π</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal">u</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mord"><span class="delimsizing size1">)</span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">∥</span><span class="mord"><span class="mord mathnormal">u</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1.8em;vertical-align:-0.65em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">π</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal">u</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mclose"><span class="mclose">∥</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord"><span class="delimsizing size2">]</span></span></span></span></span></span></div>
+        <p><i>D<sub>U</sub></i> is the distance transform of <i>U</i> = object ∪ hand (zero inside), and π clamps to the crop, so points that leave the crop are penalised too.</p></div>
+    </div>
+    <div class="eq refine"><h4>Refinement — FoundationPose's original loss on the predicted pose update</h4>
+      <div class="kx"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>L</mi><mtext>refine</mtext></msub><mo>=</mo><msub><mi>λ</mi><mi>t</mi></msub><msub><mrow><mo fence="true">∥</mo><mi mathvariant="normal">Δ</mi><mi mathvariant="bold">t</mi><mo>−</mo><mi mathvariant="normal">Δ</mi><msub><mi mathvariant="bold">t</mi><mrow><mi>g</mi><mi>t</mi></mrow></msub><mo fence="true">∥</mo></mrow><mn>2</mn></msub><mo>+</mo><msub><mi>λ</mi><mi>R</mi></msub><msub><mrow><mo fence="true">∥</mo><mi mathvariant="normal">Δ</mi><mi mathvariant="bold">R</mi><mo>−</mo><mi mathvariant="normal">Δ</mi><msub><mi mathvariant="bold">R</mi><mrow><mi>g</mi><mi>t</mi></mrow></msub><mo fence="true">∥</mo></mrow><mn>2</mn></msub></mrow><annotation encoding="application/x-tex">L_{\text{refine}} = \lambda_t \left\lVert \Delta\mathbf{t} - \Delta\mathbf{t}_{gt} \right\rVert_2 + \lambda_R \left\lVert \Delta\mathbf{R} - \Delta\mathbf{R}_{gt} \right\rVert_2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">L</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">refine</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.0858em;vertical-align:-0.3358em;"></span><span class="mord"><span class="mord mathnormal">λ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="minner"><span class="minner"><span class="mopen delimcenter" style="top:0em;">∥</span><span class="mord">Δ</span><span class="mord mathbf">t</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">Δ</span><span class="mord"><span class="mord mathbf">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">g</span><span class="mord mathnormal mtight">t</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mclose delimcenter" style="top:0em;">∥</span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1153em;"><span style="top:-2.3642em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.3358em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1.0858em;vertical-align:-0.3358em;"></span><span class="mord"><span class="mord mathnormal">λ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.00773em;">R</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="minner"><span class="minner"><span class="mopen delimcenter" style="top:0em;">∥</span><span class="mord">Δ</span><span class="mord mathbf">R</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">Δ</span><span class="mord"><span class="mord mathbf">R</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">g</span><span class="mord mathnormal mtight">t</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mclose delimcenter" style="top:0em;">∥</span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1153em;"><span style="top:-2.3642em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.3358em;"><span></span></span></span></span></span></span></span></span></span></span></div>
+      <p>Δ<i>t</i><sub>gt</sub> and Δ<i>R</i><sub>gt</sub> are the ground-truth translation and rotation updates; rotations are compared as axis-angle vectors. λ<sub>t</sub> = 1 and λ<sub>R</sub> = 0.1, the weights in the configuration file of the released FoundationPose repository.</p></div>
+    <div class="eq"><h4>Total — the silhouette loss is added to the refinement loss</h4>
+      <div class="pair"><div class="kx"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi>L</mi><mtext>sil</mtext></msub><mo>=</mo><mfrac><mrow><msub><mi>L</mi><mtext>cov</mtext></msub><mo>+</mo><msub><mi>L</mi><mtext>out</mtext></msub></mrow><mi>W</mi></mfrac><mo separator="true">,</mo></mrow><annotation encoding="application/x-tex">L_{\text{sil}} = \frac{L_{\text{cov}} + L_{\text{out}}}{W},</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">L</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">sil</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.0463em;vertical-align:-0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3603em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">W</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">L</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">cov</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal">L</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">out</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mpunct">,</span></span></span></span></span></div><div class="kx"><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>L</mi><mo>=</mo><msub><mi>L</mi><mtext>refine</mtext></msub><mo>+</mo><msub><mi>λ</mi><mtext>sil</mtext></msub><msub><mi>L</mi><mtext>sil</mtext></msub></mrow><annotation encoding="application/x-tex">L = L_{\text{refine}} + \lambda_{\text{sil}} L_{\text{sil}}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">L</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">L</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">refine</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8444em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">λ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">sil</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal">L</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord text mtight"><span class="mord mtight">sil</span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span></div></div>
+      <p>The two silhouette terms are normalised by the crop size <i>W</i> = 160 pixels; λ<sub>sil</sub> = 0.5, set empirically.</p></div>
+  </div>
+</section>
+
+<!-- ============ DATASET ============ -->
+<section id="data">
+  <div class="wrap">
+    <div class="num">05 · MOCAP TOOLS DATASET</div>
+    <h2>A benchmark of egocentric tool use.</h2>
+    <p>Egocentric datasets are full of tool use but have no ground-truth object pose; pose benchmarks have ground-truth but few hand-held tools. MoCap Tools is our validation set for exactly that gap.</p>
+  </div>
+  <div class="wide">
+    <div class="facts">
+      <div><b>11</b><span>manipulation sequences with 11 everyday tools, about 15 s each</span></div>
+      <div><b>4,875</b><span>RGB-D frames with ground-truth 6-DoF tool and target poses</span></div>
+      <div><b>30 fps</b><span>2016 × 1512 egocentric RGB from Project Aria Gen 2 glasses</span></div>
+      <div><b>9 cams</b><span>OptiTrack motion capture at 60 Hz, markers on tools and headset</span></div>
+    </div>
+    <div class="two">
+      <div>
+        <div class="kicker">Tools</div><div class="pills" id="tools"></div>
+        <div class="kicker">Target objects</div><div class="pills" id="targets"></div>
+        <p style="font-size:.97rem">Depth comes from FoundationStereo applied to the Aria glasses' SLAM stereo pair. Ground-truth poses come from the motion-capture system, registered to the RGB camera by calibrating the rigid transform between the headset's markers and the camera, and synchronised in time by matching angular velocities. The fisheye RGB is rectified to a perspective image at the same resolution.</p>
+      </div>
+      <figure style="margin:0"><img src="assets/img/optitrack.jpg" alt="Motion-capture stage: a table surrounded by tripod-mounted OptiTrack cameras." loading="lazy"><figcaption><b class="lbl">Figure 4.</b> The capture setup.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section id="results">
+  <div class="wrap">
+    <div class="num">06 · QUANTITATIVE RESULTS</div>
+    <h2>Best on all but four metrics.</h2>
+    <p>We compare with five estimators and trackers on DexYCB (unseen-object split S3), HO3Dv3 and our MoCap Tools, all given the same RGB-D frames, intrinsics and BundleSDF-reconstructed meshes. Relative pose error is measured between consecutive frames (local motion) and from the first frame to every later one (accumulated drift).</p>
+  </div>
+  <div class="wide">
+    <div class="panel">
+      <div class="ctl">
+        <div><label>Dataset</label><span id="c-ds"></span></div>
+        <div><label>Interval</label><span id="c-iv"></span></div>
+        <div><label>Metric</label><span id="c-mt"></span></div>
+      </div>
+      <div class="bars" id="bars"></div>
+      <p class="chartnote" id="chartnote"></p>
+      <details><summary>Table 1. Main results in a table.</summary><div class="tblwrap" id="t1"></div></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FRAMES ============ -->
+<section id="frames">
+  <div class="wrap">
+    <div class="num">07 · QUALITATIVE RESULTS</div>
+  </div>
+  <div class="wide">
+    <div class="panel" style="margin-top:1rem">
+      <div class="ctl">
+        <div><label>Sequence</label><span id="q-set"></span></div>
+        <div><label>Methods</label><span id="q-m"></span></div>
+      </div>
+      <div class="grid" id="qgrid"></div>
+      <p class="chartnote" id="qnote"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ABLATION ============ -->
+<section id="ablation">
+  <div class="wrap">
+    <div class="num">08 · ABLATIONS</div>
+  </div>
+  <div class="wide">
+    <div class="panel" style="max-width:52rem;margin:1rem auto 0"><div class="tblwrap" id="t2"></div><p class="chartnote" id="t2note"></p></div>
+  </div>
+  <div class="wrap">
+    <h3>Do the hand and object masks help?</h3>
+    <p>Each mask alone improves translation but leaves rotation flat or worse. Together they lower every error but one.</p>
+  </div>
+  <div class="wide">
+    <figure class="spaced">
+      <div class="trip">
+        <figure><img src="assets/img/abl_hand.jpg" alt="Hand mask only: the predicted outline collapses onto the hand." loading="lazy"><b>Hand mask only</b><span>The object region is empty, so <i>L</i><sub>cov</sub> is zero and <i>L</i><sub>out</sub> pushes every point into the hand.</span></figure>
+        <figure><img src="assets/img/abl_object.jpg" alt="Object mask only: the predicted outline is offset from the ground-truth." loading="lazy"><b>Object mask only</b><span><i>L</i><sub>out</sub> incorrectly penalises tool points that are simply behind the hand.</span></figure>
+        <figure><img src="assets/img/abl_both.jpg" alt="Both masks: the predicted outline matches the ground-truth." loading="lazy"><b>Both masks</b><span>Projected points cover the visible region while staying inside the masks.</span></figure>
+      </div>
+      <figcaption><b class="lbl">Figure 7.</b> <span class="pred">Predicted</span> and <span class="obj">ground-truth</span> brush outlines for models trained with the hand mask alone, the object mask alone, or both. Orange marks the <span class="hand">hand mask</span>.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+    <h3>Does explicit hand pose help?</h3>
+    <p>Adding explicit hand geometry on top of both masks — wrist pose or 21 hand joints from MINT, a state-of-the-art hand pose estimator — does not help (last two rows of Table 2). Masks are a simpler and more effective signal, directly capturing the hand-object occlusion patterns not explicitly represented by hand poses.</p>
+  </div>
+  <div class="wide">
+    <figure class="spaced">
+      <div class="trip">
+        <img src="assets/img/mint_1.jpg" alt="Predicted hand skeleton far from the ground-truth hand." loading="lazy" style="border-radius:10px">
+        <img src="assets/img/mint_2.jpg" alt="Predicted hand skeleton far from the ground-truth hand." loading="lazy" style="border-radius:10px">
+        <img src="assets/img/mint_3.jpg" alt="Predicted hand skeleton close to the ground-truth hand." loading="lazy" style="border-radius:10px">
+      </div>
+      <figcaption><b class="lbl">Figure 8.</b> The estimator's <span class="pred">predicted</span> hands are inconsistent against <span class="obj">ground-truth</span>, which can inject noise. </figcaption>
+    </figure>
+  </div>
+  <div class="wrap">
+      <h3>Does the silhouette loss help?</h3>
+      <p>Table 1 shows that incorporating the silhouette loss improves or maintains performance on all but one metric. This suggests that explicitly constraining the projected object geometry using hand and object masks provides useful supervision beyond the refiner's existing training objective.</p>
+  </div>
+  <div class="wide">
+    <div class="panel spaced" style="margin-top:.4rem"><div class="tblwrap" id="t5"></div><p class="chartnote" id="t5note"></p></div>
+  </div>
+  <div class="wrap">
+    <h3>Does the segmenter matter?</h3>
+    <p>We train an additional model using hand masks generated by SAM 3 while keeping all other settings unchanged. We also generate evaluation masks using SAM 3, yielding four training&ndash;evaluation combinations. Performance is comparable across them and above both FoundationPose variants on most metrics.</p>
+  </div>
+  <div class="wide">
+    <div class="panel spaced" style="margin-top:.4rem"><div class="tblwrap" id="t3"></div><p class="chartnote"><b class="lbl">Table 4.</b> Robustness to hand segmentation methods..</p></div>
+  </div>
+  <div class="wrap">
+    <h3>Does mesh quality matter?</h3>
+    <p>With ground-truth meshes instead of reconstructed ones on DexYCB, our method still outperforms all baselines at both temporal intervals.</p>
+  </div>
+  <div class="wide">
+    <div class="panel spaced" style="margin-top:.4rem"><div class="tblwrap" id="t4"></div><p class="chartnote"><b class="lbl">Table 5.</b> Robustness to mesh quality.</p></div>
+  </div>
+</section>
+
+<!-- ============ CITE ============ -->
+<section id="cite"><div class="wrap">
+  <h3>Citation</h3>
+  <p><span class="btn soon">BibTeX <small>coming soon</small></span></p>
+</div></section>
+<!-- <footer><div class="wrap">Anonymous submission to CVPR 2027. This page accompanies the paper as supplementary material.</div></footer> -->
+
+<dialog id="lb"><img alt=""><p></p></dialog>
+
+<script src="assets/data.js"></script>
+<script>
+(function(){
+'use strict';
+var P = window.PAPER, $ = function(s, r){ return (r||document).querySelector(s); }, $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+function cap(node, label, text){ node.textContent = text; node.insertAdjacentHTML('afterbegin', '<b class="lbl">' + label + '</b> '); }   // numbered caption
+function el(tag, attrs, html){ var e = document.createElement(tag); for (var k in attrs||{}) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
+function fmt(v, c){ return v == null ? '–' : v.toFixed(c.metric === 'RTE' ? 1 : 2); }
+
+/* ---------- results chart ---------- */
+var state = { ds:'MoCap Tools', iv:'consecutive', mt:'rte90' };
+var metrics = [ ['rre','Mean RRE'], ['rte','Mean RTE'], ['rre90','P90 RRE'], ['rte90','P90 RTE'], ['add','ADD'], ['adds','ADD-S'] ];
+function seg(host, items, key){ host.innerHTML = ''; items.forEach(function(it){ var b = el('button', { 'class':'chip', 'aria-pressed': state[key] === it[0] }, it[1]); b.addEventListener('click', function(){ state[key] = it[0]; drawChart(); }); host.appendChild(b); }); }
+function colIndex(){ var k = (state.iv === 'initial' ? 'i_' : 'c_') + state.mt; for (var i = 0; i < P.columns.length; i++) if (P.columns[i].k === k) return i; }
+function drawChart(){
+  seg($('#c-ds'), P.datasets.map(function(d){ return [d, d]; }), 'ds');
+  seg($('#c-iv'), [['consecutive','Consecutive (i → i+1)'], ['initial','From first frame (0 → i)']], 'iv');
+  seg($('#c-mt'), metrics, 'mt');
+  var ci = colIndex(), col = P.columns[ci], rows = P.table1[state.ds].map(function(r){ return { id:r.id, v:r.v[ci] }; }), host = $('#bars'); host.innerHTML = '';
+  var have = rows.filter(function(r){ return r.v != null; }), lower = col.better === 'lower';
+  rows.sort(function(a, b){ if (a.v == null) return 1; if (b.v == null) return -1; return lower ? a.v - b.v : b.v - a.v; });
+  var vals = have.map(function(r){ return r.v; }).sort(function(a, b){ return a - b; }), max = vals[vals.length-1], med = vals.length ? (vals[3] + vals[4]) / 2 : 1;
+  var axis = lower ? Math.min(max, vals[Math.min(3, vals.length - 1)] * 3) : 100, anyCut = false;   // focus the axis on the competitive group; longer bars are cut and labelled
+  rows.forEach(function(r){
+    var cut = r.v != null && r.v > axis * 1.001, w = r.v == null ? 0 : Math.min(1, r.v / axis) * 100; anyCut = anyCut || cut;
+    var row = el('div', { 'class':'bar' + (r.id === 'ours' ? ' ours' : r.id === 'ours_nosil' ? ' nosil' : '') + (cut ? ' cut' : '') + (r.v == null ? ' na' : '') });
+    row.appendChild(el('div', { 'class':'name' }, P.methods[r.id] + '<small>' + P.methodKind[r.id] + '</small>'));
+    var tr = el('div', { 'class':'track' }), f = el('div', { 'class':'fill', style:'width:0' }); tr.appendChild(f); row.appendChild(tr);
+    row.appendChild(el('output', {}, r.v == null ? 'n/a' : fmt(r.v, col) + (cut ? ' ››' : '')));
+    host.appendChild(row); requestAnimationFrame(function(){ f.style.width = w + '%'; });
+  });
+  var note = col.stat + ' ' + col.metric + ' in ' + (col.unit === '°' ? 'degrees' : col.unit === 'mm' ? 'millimetres' : 'percent (AUC)') + '; ' + (lower ? 'lower is better' : 'larger is better') + '. ';
+  if (!have.length) note = 'ADD and ADD-S are not reported for MoCap Tools: it has no object models registered to the ground-truth frame.';
+  else { if (anyCut) note += 'Hatched bars (››) run past the axis. '; if (col.metric === 'RTE') note += 'Per-clip translation errors are capped at ' + (state.iv === 'initial' ? '2000' : '1000') + ' mm before averaging. '; }
+  cap($('#chartnote'), 'Figure 5.', note);
+  $('#t1').innerHTML = ''; $('#t1').appendChild(bigTable(P.table1[state.ds], function(r){ return P.methods[r.id]; }, function(r){ return r.id === 'ours'; }, undefined, 'row'));
+}
+function rank(rows, ci, col){ var v = rows.map(function(r){ return r.v[ci]; }).filter(function(x){ return x != null; }); var u = Array.from(new Set(v)).sort(function(a, b){ return col.better === 'lower' ? a - b : b - a; }); return { best:u[0], second:u[1] }; }
+function gcls(i){ return i < 6 ? 'g0' + (i === 0 ? ' g0s' : '') : 'g1' + (i === 6 ? ' gs' : ''); }   // column group: 0-5 consecutive, 6-11 initial-to-subsequent
+function bigTable(rows, nameOf, isOurs, sepAt, mode){
+  var bestCls = mode ? ' top' : ' best', t = el('table', mode === 'row' ? { 'class':'rowhl' } : {}), h = '<thead><tr><th rowspan="2" class="l">Method</th><th colspan="6" class="grp g0">Consecutive frames (i → i+1)</th><th colspan="6" class="grp g1 gs">Initial-to-subsequent frames (0 → i)</th></tr><tr>';
+  P.columns.forEach(function(c, i){ h += '<th class="' + gcls(i) + '">' + (c.stat === 'AUC' ? '' : c.stat + '<br>') + c.metric + (c.better === 'lower' ? ' ↓' : ' ↑') + '</th>'; });
+  h += '</tr></thead><tbody>';
+  var rk = P.columns.map(function(c, i){ return rank(rows, i, c); });
+  rows.forEach(function(r, ri){
+    h += '<tr class="' + (isOurs(r) ? 'ours' : '') + (sepAt === ri ? ' dash' : '') + '"><td class="l">' + nameOf(r) + '</td>';
+    r.v.forEach(function(v, i){ h += '<td class="' + gcls(i) + (v != null && v === rk[i].best ? bestCls : v != null && v === rk[i].second ? ' second' : '') + '">' + fmt(v, P.columns[i]) + '</td>'; });
+    h += '</tr>';
+  });
+  t.innerHTML = h + '</tbody>'; return t;
+}
+drawChart();
+
+/* ---------- qualitative grid ---------- */
+var q = { set:'mocap', on:{ ours:1, fp_pre:1, fp_ft:1 } }, short = { ours:'Ours', fp_pre:'FoundationPose (pretrained)', fp_ft:'FoundationPose (fine-tuned)', megapose:'MegaPose', foundpose:'FoundPose', freepose:'FreePose', unihope:'UniHOPE' };
+function drawQ(){
+  var hs = $('#q-set'); hs.innerHTML = ''; P.qual.sets.forEach(function(s){ var b = el('button', { 'class':'chip', 'aria-pressed': q.set === s.k }, s.label); b.addEventListener('click', function(){ q.set = s.k; drawQ(); }); hs.appendChild(b); });
+  var hm = $('#q-m'); hm.innerHTML = ''; P.qual.methods.forEach(function(m){ var b = el('button', { 'class':'chip', 'aria-pressed': !!q.on[m] }, short[m].replace('FoundationPose', 'FP')); b.addEventListener('click', function(){ if (m === 'ours') return; q.on[m] = !q.on[m]; drawQ(); }); if (m === 'ours') b.title = 'Always shown'; hm.appendChild(b); });
+  var g = $('#qgrid'), set = P.qual.sets.filter(function(s){ return s.k === q.set; })[0], time = q.set !== 'random'; g.innerHTML = '';
+  g.appendChild(el('div', { 'class':'hd corner' }, time ? 'time →' : ''));
+  for (var c = 1; c <= 5; c++) g.appendChild(el('div', { 'class':'hd' }, (time ? 'keyframe ' : 'sample ') + c));
+  P.qual.methods.forEach(function(m){ if (!q.on[m]) return;
+    g.appendChild(el('div', { 'class':'rl' + (m === 'ours' ? ' ours' : '') }, short[m]));
+    for (var c = 1; c <= 5; c++) { var src = 'assets/' + P.qual.path.replace('{set}', q.set).replace('{method}', m).replace('{frame}', c);
+      var im = el('img', { src:src, loading:'lazy', alt: short[m] + ', ' + set.label + ', ' + (time ? 'keyframe ' : 'sample ') + c, tabindex:'0' }); im.dataset.cap = short[m] + ' · ' + set.label + ' · ' + (time ? 'keyframe ' : 'sample ') + c; g.appendChild(im); }
+  });
+  cap($('#qnote'), 'Figure 6.', set.note + ' Saturated RGB axes are the predicted pose; the thicker, semi-transparent axes are ground-truth. Click a frame to enlarge.');
+}
+drawQ();
+var lb = $('#lb');
+function openLb(im){ $('img', lb).src = im.src; $('p', lb).textContent = im.dataset.cap; if (lb.showModal) lb.showModal(); }
+$('#qgrid').addEventListener('click', function(e){ if (e.target.tagName === 'IMG') openLb(e.target); });
+$('#qgrid').addEventListener('keydown', function(e){ if (e.key === 'Enter' && e.target.tagName === 'IMG') openLb(e.target); });
+lb.addEventListener('click', function(){ lb.close(); });
+
+/* ---------- small tables ---------- */
+(function(){ var T = P.table2, t = el('table'), h = '<thead><tr><th class="l">Refiner input</th>' + T.columns.map(function(c){ return '<th>' + c + ' ↓</th>'; }).join('') + '</tr></thead><tbody>';
+  var best = [0,1,2,3].map(function(i){ var v = T.rows.map(function(r){ return r.v[i]; }).sort(function(a, b){ return a - b; }); return [v[0], v[1]]; });
+  var nice = ['Pretrained FoundationPose', 'Fine-tuned, no additional inputs', '+ hand masks', '+ object masks', '+ both masks (ours)', '+ both masks + wrist poses', '+ both masks + hand poses'];
+  T.rows.forEach(function(r, ri){ h += '<tr class="' + (ri === 4 ? 'ours' : '') + '"><td class="l">' + nice[ri] + '</td>' + r.v.map(function(v, i){ return '<td class="' + (v === best[i][0] ? 'top' : v === best[i][1] ? 'second' : '') + '">' + v.toFixed(i % 2 ? 1 : 2) + '</td>'; }).join('') + '</tr>'; });
+  t.innerHTML = h + '</tbody>'; t.className = 'rowhl'; t.style.minWidth = '560px'; $('#t2').appendChild(t);
+  cap($('#t2note'), 'Table 2.', 'Refiner inputs. ' + T.note + ' Bold and underlined values indicate the best and second-best performance, respectively. The highlighted row shows results for our method.'); })();
+(function(){ var host = $('#t3'); P.datasets.forEach(function(d, di){ host.appendChild(el('p', { style:'font:600 .85rem var(--body);margin:' + (di ? '1rem' : '0') + ' 0 .2rem' }, d)); host.appendChild(bigTable(P.table3[d], function(r){ return r.name.replace('FP', 'FoundationPose').replace(/GDINO/g, 'Grounding DINO'); }, function(r){ return r.name === 'Ours (train, eval: GDINO+SAM 2)'; }, 2, 'plain')); });
+  $('#t4').appendChild(bigTable(P.table4.DexYCB, function(r){ return P.methods[r.id].replace(' (w/ silhouette loss)', ''); }, function(r){ return r.id === 'ours'; })); })();
+
+(function(){ var cols = P.columns.slice(0, 6), h = '<thead><tr><th class="l">Dataset</th><th class="l">Interval</th>' + cols.map(function(c){ return '<th>' + (c.stat === 'AUC' ? '' : c.stat + ' ') + c.metric + (c.better === 'lower' ? ' ↓' : ' ↑') + '</th>'; }).join('') + '</tr></thead><tbody>';
+  P.datasets.forEach(function(d){ var rows = {}; P.table1[d].forEach(function(r){ rows[r.id] = r.v; });
+    [['c_', 'Consecutive (i → i+1)'], ['i_', 'Initial-to-subsequent (0 → i)']].forEach(function(iv, k){
+      h += '<tr' + (k === 0 ? ' class="sep"' : '') + '><td class="l">' + (k === 0 ? d : '') + '</td><td class="l">' + iv[1] + '</td>';
+      cols.forEach(function(c){ var ci = P.columns.map(function(x){ return x.k; }).indexOf(iv[0] + c.k.slice(2)), col = P.columns[ci], a = rows.ours_nosil[ci], b = rows.ours[ci];
+        if (a == null) { h += '<td>n/a</td>'; return; }
+        var better = col.better === 'lower' ? b < a : b > a;
+        h += '<td class="' + (a === b ? '' : better ? 'gain' : 'worse') + '">' + fmt(a, col) + ' → ' + fmt(b, col) + '</td>'; });
+      h += '</tr>'; }); });
+  var t = el('table'); t.innerHTML = h + '</tbody>'; t.style.minWidth = '760px'; $('#t5').appendChild(t);
+  cap($('#t5note'), 'Table 3.', 'Effect of the silhouette loss. Each cell: ours without → with the silhouette loss, from Table 1. Green: better with the loss; red: worse; plain: unchanged. '); })();
+
+/* ---------- dataset ---------- */
+P.dataset.tools.forEach(function(t){ $('#tools').appendChild(el('span', {}, t)); });
+P.dataset.targets.forEach(function(t){ $('#targets').appendChild(el('span', {}, t)); });
+$$('a[data-todo]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); }); });
+})();
+</script>
+</body>
+</html>
